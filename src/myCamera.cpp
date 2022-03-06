@@ -1,36 +1,54 @@
-#include "../include/myKeyboard.h"
+#include "../include/myCamera.h"
 
-bool MyKeyboard::_isKeyboardPolling = false;
-bool MyKeyboard::_isKeyboard = false;
-usb_transfer_t *MyKeyboard::_KeyboardIn = NULL;
-usb_transfer_t *MyKeyboard::_KeyboardOut = NULL;
-bool MyKeyboard::_isKeyboardReady = false;
+bool MyCamera::_isCameraPolling = false;
+bool MyCamera::_isCamera = false;
+usb_transfer_t *MyCamera::_CameraIn = NULL;
+usb_transfer_t *MyCamera::_CameraOut = NULL;
+usb_transfer_t *MyCamera::_CameraInterrupt = NULL;
+uint8_t CameraInterval;
+bool MyCamera::isCameraReady = false;
 
-usb_host_client_handle_t MyKeyboard::_Client_Handle;
-usb_device_handle_t MyKeyboard::_Device_Handle;
+usb_host_client_handle_t MyCamera::_Client_Handle;
+usb_device_handle_t MyCamera::_Device_Handle;
 
-usb_host_enum_cb_t MyKeyboard::_USB_host_enumerate;
+usb_host_enum_cb_t MyCamera::_USB_host_enumerate;
+
+#define PTP_USB_CONTAINER_UNDEFINED 0x0000
+#define PTP_USB_CONTAINER_COMMAND 0x0001
+#define PTP_USB_CONTAINER_DATA 0x0002
+#define PTP_USB_CONTAINER_RESPONSE 0x0003
+#define PTP_USB_CONTAINER_EVENT 0x0004
 
 bool isBiDirectional = false;
 
-MyKeyboard myKeyboard;
+MyCamera myCamera;
 
-void MyKeyboard::init()
+void MyCamera::init()
 {
-    Serial.println("MyKeyboard init");
+    Serial.println("MyCamera init");
     _usbh_setup(_show_config_desc_full);
 }
 
-void MyKeyboard::_keyboard_transfer_cb(usb_transfer_t *transfer)
+void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
 {
-    Serial.println("_keyboard_transfer_cb");
+    Serial.println("_camera_transfer_cb");
 
     if (_Device_Handle == transfer->device_handle)
     {
-        _isKeyboardPolling = false;
+        _isCameraPolling = false;
         int in_xfer = transfer->bEndpointAddress & USB_B_ENDPOINT_ADDRESS_EP_DIR_MASK;
         uint8_t *const p = transfer->data_buffer;
-        if (!in_xfer)
+
+        if (transfer->bEndpointAddress == _CameraInterrupt->bEndpointAddress)
+        {
+            Serial.printf("callback interrupt. in_xfer: %d, number: %d\n", in_xfer, transfer->actual_num_bytes);
+            for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
+            {
+                Serial.printf("%02x ", p[i]);
+            }
+            Serial.println();
+        }
+        else if (transfer->bEndpointAddress == _CameraOut->bEndpointAddress)
         {
             Serial.printf("transfer sent to %02x: ", transfer->bEndpointAddress);
             for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
@@ -39,7 +57,7 @@ void MyKeyboard::_keyboard_transfer_cb(usb_transfer_t *transfer)
             }
             Serial.println();
         }
-        else if (transfer->status == 0)
+        else if (transfer->bEndpointAddress == _CameraIn->bEndpointAddress && transfer->status == 0)
         {
             // if (transfer->actual_num_bytes >= 8)
             //{
@@ -50,6 +68,56 @@ void MyKeyboard::_keyboard_transfer_cb(usb_transfer_t *transfer)
                 Serial.printf("%02x ", p[i]);
             }
             Serial.println();
+
+            uint16_t container_type = p[4] | (p[5] << 8);
+            switch (container_type)
+            {
+            case PTP_USB_CONTAINER_COMMAND:
+                Serial.println("PTP_USB_CONTAINER_COMMAND");
+                break;
+            case PTP_USB_CONTAINER_DATA:
+                // Serial.println("PTP_USB_CONTAINER_DATA");
+                {
+                    uint16_t operation_code = p[6] | (p[7] << 8);
+                    if (operation_code == 0x1015)
+                    {
+                        uint32_t value = p[12] | (p[13] << 8) | (p[14] << 16) | (p[15] << 24);
+                        Serial.printf("PTP_OC_GetDevicePropValue with value: %08x\n", value);
+                    }
+                    else if (operation_code == 0x90c7)
+                    {
+                        uint8_t number_of_events = p[12] | (p[13] << 8);
+                        for (uint8_t i = 0; i < number_of_events; i++)
+                        {
+                            uint16_t event_code = p[14 + i * 6] | (p[15 + i * 6] << 8);
+                            uint16_t property_code = p[16 + i * 6] | (p[17 + i * 6] << 8);
+                            Serial.printf("event(%d): code: %04x, property: %04x\n", i + 1, event_code, property_code);
+                        }
+                    }
+                }
+                break;
+            case PTP_USB_CONTAINER_RESPONSE:
+                // Serial.println("PTP_USB_CONTAINER_RESPONSE");
+                {
+                    uint16_t response_code = p[6] | (p[7] << 8);
+                    if (response_code == 0x2001)
+                    {
+                        Serial.println("Response code OK");
+                    }
+                    else
+                    {
+                        Serial.printf("Response code error: %04x\n", response_code);
+                    }
+                }
+                break;
+            case PTP_USB_CONTAINER_EVENT:
+                Serial.println("PTP_USB_CONTAINER_EVENT");
+                break;
+
+            default:
+                Serial.printf("PTP_USB_CONTAINER_UNDEFINED: %04x\n", container_type);
+                break;
+            }
 
             esp_err_t err = usb_host_transfer_submit(transfer);
             if (err != ESP_OK)
@@ -100,7 +168,7 @@ void MyKeyboard::_keyboard_transfer_cb(usb_transfer_t *transfer)
     }
 }
 
-void MyKeyboard::_check_interface_desc_boot_keyboard(const void *p)
+void MyCamera::_check_interface_desc_camera(const void *p)
 {
     const usb_intf_desc_t *intf = (const usb_intf_desc_t *)p;
 
@@ -108,7 +176,7 @@ void MyKeyboard::_check_interface_desc_boot_keyboard(const void *p)
         (intf->bInterfaceSubClass == 1) &&
         (intf->bInterfaceProtocol == 1))
     {
-        _isKeyboard = true;
+        _isCamera = true;
         Serial.printf("Claiming a boot keyboard!\n");
         esp_err_t err = usb_host_interface_claim(_Client_Handle, _Device_Handle,
                                                  intf->bInterfaceNumber, intf->bAlternateSetting);
@@ -128,7 +196,7 @@ void MyKeyboard::_check_interface_desc_boot_keyboard(const void *p)
             {
                 if (intf->bNumEndpoints < 2)
                 {
-                    _isKeyboard = false;
+                    _isCamera = false;
                     return;
                 }
             }
@@ -136,12 +204,12 @@ void MyKeyboard::_check_interface_desc_boot_keyboard(const void *p)
             {
                 if (intf->bNumEndpoints < 1)
                 {
-                    _isKeyboard = false;
+                    _isCamera = false;
                     return;
                 }
             }
-            _isKeyboard = true;
-            ESP_LOGI("", "Claiming a %s-directional printer!", (isBiDirectional) ? "bi" : "uni");
+            _isCamera = true;
+            ESP_LOGI("", "Claiming a %s-directional camera!", (isBiDirectional) ? "bi" : "uni");
             esp_err_t err = usb_host_interface_claim(_Client_Handle, _Device_Handle,
                                                      intf->bInterfaceNumber, intf->bAlternateSetting);
             if (err != ESP_OK)
@@ -150,12 +218,12 @@ void MyKeyboard::_check_interface_desc_boot_keyboard(const void *p)
     }
     else
     {
-        Serial.printf("Not Claiming a boot keyboard!\n-bInterfaceClass: 0x%02x\n-bInterfaceSubClass: %d\n-bInterfaceProtocol: %d\n",
+        Serial.printf("Not Claiming a boot camera!\n-bInterfaceClass: 0x%02x\n-bInterfaceSubClass: %d\n-bInterfaceProtocol: %d\n",
                       intf->bInterfaceClass, intf->bInterfaceSubClass, intf->bInterfaceProtocol);
     }
 }
 
-void MyKeyboard::_prepare_endpoint(const void *p)
+void MyCamera::_prepare_endpoint(const void *p)
 {
     Serial.println("_prepare_endpoint");
     const usb_ep_desc_t *endpoint = (const usb_ep_desc_t *)p;
@@ -167,26 +235,53 @@ void MyKeyboard::_prepare_endpoint(const void *p)
     // if ((endpoint->bmAttributes & USB_BM_ATTRIBUTES_XFERTYPE_MASK) != USB_BM_ATTRIBUTES_XFER_INT)
     if ((endpoint->bmAttributes & USB_BM_ATTRIBUTES_XFERTYPE_MASK) != USB_BM_ATTRIBUTES_XFER_BULK)
     {
+        if ((endpoint->bmAttributes & USB_BM_ATTRIBUTES_XFERTYPE_MASK) == USB_BM_ATTRIBUTES_XFER_INT)
+        {
+            Serial.printf("Interrupt endpoint: 0x%02x\n", endpoint->bmAttributes);
+            if (endpoint->bEndpointAddress & USB_B_ENDPOINT_ADDRESS_EP_DIR_MASK)
+            {
+                err = usb_host_transfer_alloc(endpoint->wMaxPacketSize * 8, 0, &_CameraInterrupt);
+                if (err != ESP_OK)
+                {
+                    _CameraInterrupt = NULL;
+                    ESP_LOGI("", "usb_host_transfer_alloc In fail: %x", err);
+                    return;
+                }
+                _CameraInterrupt->device_handle = _Device_Handle;
+                _CameraInterrupt->bEndpointAddress = endpoint->bEndpointAddress;
+                _CameraInterrupt->callback = _camera_transfer_cb;
+                _CameraInterrupt->context = NULL;
+                isCameraReady = true;
+                CameraInterval = endpoint->bInterval;
+                Serial.printf("Interrupt interval: %d\n", CameraInterval);
+                ESP_LOGI("", "USB boot Camera ready");
+            }
+            else
+            {
+                ESP_LOGI("", "Ignoring interrupt Out endpoint");
+            }
+        }
+
         Serial.printf("Not interrupt endpoint: 0x%02x\n", endpoint->bmAttributes);
         return;
     }
     if (endpoint->bEndpointAddress & USB_B_ENDPOINT_ADDRESS_EP_DIR_MASK)
     {
         Serial.println("(IN)endpoint processing");
-        err = usb_host_transfer_alloc(endpoint->wMaxPacketSize, 0, &_KeyboardIn);
+        err = usb_host_transfer_alloc(endpoint->wMaxPacketSize, 0, &_CameraIn);
         if (err != ESP_OK)
         {
-            _KeyboardIn = NULL;
+            _CameraIn = NULL;
             ESP_LOGI("", "usb_host_transfer_alloc In fail: %x", err);
             return;
         }
-        _KeyboardIn->device_handle = _Device_Handle;
-        _KeyboardIn->bEndpointAddress = endpoint->bEndpointAddress;
-        _KeyboardIn->callback = _keyboard_transfer_cb;
-        _KeyboardIn->context = NULL;
-        _KeyboardIn->num_bytes = endpoint->wMaxPacketSize;
+        _CameraIn->device_handle = _Device_Handle;
+        _CameraIn->bEndpointAddress = endpoint->bEndpointAddress;
+        _CameraIn->callback = _camera_transfer_cb;
+        _CameraIn->context = NULL;
+        _CameraIn->num_bytes = endpoint->wMaxPacketSize;
 
-        esp_err_t err = usb_host_transfer_submit(_KeyboardIn);
+        esp_err_t err = usb_host_transfer_submit(_CameraIn);
         if (err != ESP_OK)
         {
             ESP_LOGI("", "usb_host_transfer_submit In fail: %x", err);
@@ -196,36 +291,34 @@ void MyKeyboard::_prepare_endpoint(const void *p)
             Serial.println("host transfet IN init");
         }
 
-        _isKeyboardReady = true;
-        Serial.printf("USB boot keyboard ready\n");
+        Serial.printf("USB camera ready\n");
     }
     else
     {
         Serial.println("(OUT)endpoint processing");
-        err = usb_host_transfer_alloc(endpoint->wMaxPacketSize * 8, 0, &_KeyboardOut);
+        err = usb_host_transfer_alloc(endpoint->wMaxPacketSize * 8, 0, &_CameraOut);
         if (err != ESP_OK)
         {
-            _KeyboardOut = NULL;
+            _CameraOut = NULL;
             ESP_LOGI("", "usb_host_transfer_alloc In fail: %x", err);
             return;
         }
-        _KeyboardOut->device_handle = _Device_Handle;
-        _KeyboardOut->bEndpointAddress = endpoint->bEndpointAddress;
-        _KeyboardOut->callback = _keyboard_transfer_cb;
-        _KeyboardOut->context = NULL;
-        _isKeyboardReady = true;
+        _CameraOut->device_handle = _Device_Handle;
+        _CameraOut->bEndpointAddress = endpoint->bEndpointAddress;
+        _CameraOut->callback = _camera_transfer_cb;
+        _CameraOut->context = NULL;
 
-        /*esp_err_t err = usb_host_transfer_submit(_KeyboardOut);
+        /*esp_err_t err = usb_host_transfer_submit(_CameraOut);
         if (err != ESP_OK)
         {
             ESP_LOGI("", "usb_host_transfer_submit Out fail: %x", err);
         }*/
 
-        Serial.printf("USB boot keyboard ready\n");
+        Serial.printf("USB camera ready\n");
     }
 }
 
-void MyKeyboard::_show_config_desc_full(const usb_config_desc_t *config_desc)
+void MyCamera::_show_config_desc_full(const usb_config_desc_t *config_desc)
 {
     // Full decode of config desc.
     const uint8_t *p = &config_desc->val[0];
@@ -252,12 +345,12 @@ void MyKeyboard::_show_config_desc_full(const usb_config_desc_t *config_desc)
             case USB_B_DESCRIPTOR_TYPE_INTERFACE:
                 Serial.println("USB_B_DESCRIPTOR_TYPE_INTERFACE");
                 USB_Class = show_interface_desc(p);
-                _check_interface_desc_boot_keyboard(p);
+                _check_interface_desc_camera(p);
                 break;
             case USB_B_DESCRIPTOR_TYPE_ENDPOINT:
                 Serial.println("USB_B_DESCRIPTOR_TYPE_ENDPOINT");
                 show_endpoint_desc(p);
-                // if (_isKeyboard && _KeyboardIn == NULL)
+                // if (_isCamera && _CameraIn == NULL)
                 _prepare_endpoint(p);
                 break;
             case USB_B_DESCRIPTOR_TYPE_DEVICE_QUALIFIER:
@@ -295,48 +388,49 @@ void MyKeyboard::_show_config_desc_full(const usb_config_desc_t *config_desc)
     }
 }
 
-void MyKeyboard::loopUsb()
+void MyCamera::loopUsb()
 {
     // Serial.println("loopUsb()");
 
     _usbh_task();
-    static unsigned long KeyboardTimer = millis();
-    /*if (_isKeyboardReady && !_isKeyboardPolling && (millis() - KeyboardTimer > _KeyboardInterval))
+    /*static unsigned long InterruptTimer = millis();
+    if (millis() > 5000 && isCameraReady && !_isCameraPolling && (millis() - InterruptTimer > CameraInterval))
     {
-        Serial.println("_isKeyboardReady && !_isKeyboardPolling && (millis() - KeyboardTimer > _KeyboardInterval)");
-        esp_err_t err = usb_host_transfer_submit(_KeyboardIn);
+        // Serial.println("isCameraReady && !_isCameraPolling && (millis() - InterruptTimer > _CameraInterval)");
+        _CameraInterrupt->num_bytes = 8;
+        esp_err_t err = usb_host_transfer_submit(_CameraInterrupt);
         if (err != ESP_OK)
         {
-            Serial.printf("usb_host_transfer_submit In fail: %x\n", err);
+            Serial.printf("(Interrupt) usb_host_transfer_submit In fail: %x\n", err);
         }
-        _isKeyboardPolling = true;
-        KeyboardTimer = 0;
+        _isCameraPolling = true;
+        InterruptTimer = 0;
     }*/
 }
 
 static uint32_t idTransaction = 0;
 
-void MyKeyboard::checkEvent()
+void MyCamera::checkEvent()
 {
     idTransaction++;
 
     uint8_t bufEvent[24] = {};
-    memset(_KeyboardOut->data_buffer, 0, 24);
-    _KeyboardOut->num_bytes = 12;
-    _KeyboardOut->data_buffer[0] = (_KeyboardOut->num_bytes & 0xff);
-    _KeyboardOut->data_buffer[1] = (_KeyboardOut->num_bytes & 0xff00) >> 8;
-    _KeyboardOut->data_buffer[2] = (_KeyboardOut->num_bytes & 0xff0000) >> 16;
-    _KeyboardOut->data_buffer[3] = (_KeyboardOut->num_bytes & 0xff000000) >> 24;
-    _KeyboardOut->data_buffer[4] = 0x01;
-    _KeyboardOut->data_buffer[5] = 0x00;
-    _KeyboardOut->data_buffer[6] = 0xC7;
-    _KeyboardOut->data_buffer[7] = 0x90;
-    _KeyboardOut->data_buffer[8] = (idTransaction & 0xff);
-    _KeyboardOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-    _KeyboardOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-    _KeyboardOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
+    memset(_CameraOut->data_buffer, 0, 24);
+    _CameraOut->num_bytes = 12;
+    _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
+    _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
+    _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
+    _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
+    _CameraOut->data_buffer[4] = (PTP_USB_CONTAINER_COMMAND & 0xff);
+    _CameraOut->data_buffer[5] = (PTP_USB_CONTAINER_COMMAND & 0xff00) >> 8;
+    _CameraOut->data_buffer[6] = 0xC7;
+    _CameraOut->data_buffer[7] = 0x90;
+    _CameraOut->data_buffer[8] = (idTransaction & 0xff);
+    _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
+    _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
+    _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
 
-    esp_err_t err = usb_host_transfer_submit(_KeyboardOut);
+    esp_err_t err = usb_host_transfer_submit(_CameraOut);
 
     if (err != ESP_OK)
     {
@@ -344,31 +438,31 @@ void MyKeyboard::checkEvent()
     }
 }
 
-void MyKeyboard::openSession()
+void MyCamera::openSession()
 {
     idTransaction = 0;
 
     uint8_t bufEvent[16] = {};
-    memset(_KeyboardOut->data_buffer, 0, 16);
-    _KeyboardOut->num_bytes = 16;
-    _KeyboardOut->data_buffer[0] = (_KeyboardOut->num_bytes & 0xff);
-    _KeyboardOut->data_buffer[1] = (_KeyboardOut->num_bytes & 0xff00) >> 8;
-    _KeyboardOut->data_buffer[2] = (_KeyboardOut->num_bytes & 0xff0000) >> 16;
-    _KeyboardOut->data_buffer[3] = (_KeyboardOut->num_bytes & 0xff000000) >> 24;
-    _KeyboardOut->data_buffer[4] = 0x01;
-    _KeyboardOut->data_buffer[5] = 0x00;
-    _KeyboardOut->data_buffer[6] = 0x02;
-    _KeyboardOut->data_buffer[7] = 0x10;
-    _KeyboardOut->data_buffer[8] = (idTransaction & 0xff);
-    _KeyboardOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-    _KeyboardOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-    _KeyboardOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
-    _KeyboardOut->data_buffer[12] = 0x01;
-    _KeyboardOut->data_buffer[13] = 0x00;
-    _KeyboardOut->data_buffer[14] = 0;
-    _KeyboardOut->data_buffer[15] = 0;
+    memset(_CameraOut->data_buffer, 0, 16);
+    _CameraOut->num_bytes = 16;
+    _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
+    _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
+    _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
+    _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
+    _CameraOut->data_buffer[4] = 0x01;
+    _CameraOut->data_buffer[5] = 0x00;
+    _CameraOut->data_buffer[6] = 0x02;
+    _CameraOut->data_buffer[7] = 0x10;
+    _CameraOut->data_buffer[8] = (idTransaction & 0xff);
+    _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
+    _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
+    _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
+    _CameraOut->data_buffer[12] = 0x01;
+    _CameraOut->data_buffer[13] = 0x00;
+    _CameraOut->data_buffer[14] = 0;
+    _CameraOut->data_buffer[15] = 0;
 
-    esp_err_t err = usb_host_transfer_submit(_KeyboardOut);
+    esp_err_t err = usb_host_transfer_submit(_CameraOut);
 
     if (err != ESP_OK)
     {
@@ -376,31 +470,31 @@ void MyKeyboard::openSession()
     }
 }
 
-void MyKeyboard::getAperture()
+void MyCamera::getAperture()
 {
     idTransaction++;
 
     uint8_t bufEvent[16] = {};
-    memset(_KeyboardOut->data_buffer, 0, 16);
-    _KeyboardOut->num_bytes = 16;
-    _KeyboardOut->data_buffer[0] = (_KeyboardOut->num_bytes & 0xff);
-    _KeyboardOut->data_buffer[1] = (_KeyboardOut->num_bytes & 0xff00) >> 8;
-    _KeyboardOut->data_buffer[2] = (_KeyboardOut->num_bytes & 0xff0000) >> 16;
-    _KeyboardOut->data_buffer[3] = (_KeyboardOut->num_bytes & 0xff000000) >> 24;
-    _KeyboardOut->data_buffer[4] = 0x01;
-    _KeyboardOut->data_buffer[5] = 0x00;
-    _KeyboardOut->data_buffer[6] = 0x15;
-    _KeyboardOut->data_buffer[7] = 0x10;
-    _KeyboardOut->data_buffer[8] = (idTransaction & 0xff);
-    _KeyboardOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-    _KeyboardOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-    _KeyboardOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
-    _KeyboardOut->data_buffer[12] = 0x0D;
-    _KeyboardOut->data_buffer[13] = 0x50;
-    _KeyboardOut->data_buffer[14] = 0;
-    _KeyboardOut->data_buffer[15] = 0;
+    memset(_CameraOut->data_buffer, 0, 16);
+    _CameraOut->num_bytes = 16;
+    _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
+    _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
+    _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
+    _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
+    _CameraOut->data_buffer[4] = 0x01;
+    _CameraOut->data_buffer[5] = 0x00;
+    _CameraOut->data_buffer[6] = 0x15;
+    _CameraOut->data_buffer[7] = 0x10;
+    _CameraOut->data_buffer[8] = (idTransaction & 0xff);
+    _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
+    _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
+    _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
+    _CameraOut->data_buffer[12] = 0x0D;
+    _CameraOut->data_buffer[13] = 0x50;
+    _CameraOut->data_buffer[14] = 0;
+    _CameraOut->data_buffer[15] = 0;
 
-    esp_err_t err = usb_host_transfer_submit(_KeyboardOut);
+    esp_err_t err = usb_host_transfer_submit(_CameraOut);
 
     if (err != ESP_OK)
     {
@@ -408,7 +502,7 @@ void MyKeyboard::getAperture()
     }
 }
 
-void MyKeyboard::_client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg)
+void MyCamera::_client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg)
 {
     Serial.println("_client_event_callback");
 
@@ -452,7 +546,7 @@ void MyKeyboard::_client_event_callback(const usb_host_client_event_msg_t *event
     }
 }
 
-void MyKeyboard::_usbh_setup(usb_host_enum_cb_t enumeration_cb)
+void MyCamera::_usbh_setup(usb_host_enum_cb_t enumeration_cb)
 {
     Serial.println("_usbh_setup()");
 
@@ -474,9 +568,9 @@ void MyKeyboard::_usbh_setup(usb_host_enum_cb_t enumeration_cb)
     _USB_host_enumerate = enumeration_cb;
 }
 
-void MyKeyboard::_usbh_task(void)
+void MyCamera::_usbh_task(void)
 {
-    Serial.println("_usbh_task()");
+    // Serial.println("_usbh_task()");
 
     uint32_t event_flags;
     static bool all_clients_gone = false;

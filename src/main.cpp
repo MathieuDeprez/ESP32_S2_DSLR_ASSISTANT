@@ -119,31 +119,31 @@ void setup()
 
   HidKeyboard.SetReportParser(0, &Prs);*/
 
-  myKeyboard.init();
+  myCamera.init();
 }
 
 void loop()
 {
-  myKeyboard.loopUsb();
+  myCamera.loopUsb();
 
   delay(100);
 
   static unsigned long beginEvent = millis();
-  if (millis() - beginEvent > 5000 && millis() > 10000)
+  if (millis() - beginEvent > 2000 && myCamera.isCameraReady)
   {
     beginEvent = millis();
-    Serial.println("checkEvent");
-    // myKeyboard.checkEvent();
+    // Serial.println("checkEvent");
 
     static bool openSession = false;
     if (!openSession)
     {
       openSession = true;
-      myKeyboard.openSession();
+      myCamera.openSession();
     }
     else
     {
-      myKeyboard.getAperture();
+      // myCamera.getAperture();
+      myCamera.checkEvent();
     }
   }
   // Usb.Task();

@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "usb/usb_host.h"
 
-#include "myKeyboard.h"
+#include "myCamera.h"
 
 void show_dev_desc(const usb_device_desc_t *dev_desc);
 void show_config_desc(const void *p);
@@ -18,6 +18,6 @@ const TickType_t CLIENT_EVENT_TIMEOUT = 1;
 extern char AzertyArraySpe[8][8];
 extern char AzertyArray[102][8];
 
-extern MyKeyboard myKeyboard;
+extern MyCamera myCamera;
 
 #endif

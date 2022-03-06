@@ -135,10 +135,16 @@ void loop()
     // Serial.println("checkEvent");
 
     static bool openSession = false;
+    static bool getDevProp = false;
     if (!openSession)
     {
       openSession = true;
       myCamera.openSession();
+    }
+    else if (!getDevProp)
+    {
+      getDevProp = true;
+      myCamera.getDevProps();
     }
     else
     {

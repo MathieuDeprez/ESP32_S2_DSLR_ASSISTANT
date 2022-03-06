@@ -7,12 +7,25 @@ typedef void (*usb_host_enum_cb_t)(const usb_config_desc_t *config_desc);
 
 class MyCamera
 {
+    typedef struct
+    {
+        uint32_t total;
+        uint32_t len;
+        uint32_t offset;
+        uint8_t data[64];
+    } PtpTransfer;
+
 public:
+    static const char *const prNames[];
     void init();
     void loopUsb();
     void checkEvent();
     void getAperture();
     void openSession();
+    void getDevProps();
+    void flushQueue();
+    // void PrintDevProp(uint8_t **pp, uint16_t *pcntdn);
+    uint16_t getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total);
     static bool isCameraReady;
 
 private:

@@ -8,6 +8,8 @@ usb_transfer_t *MyCamera::_CameraInterrupt = NULL;
 uint8_t CameraInterval;
 bool MyCamera::isCameraReady = false;
 
+QueueHandle_t xQueue1;
+
 usb_host_client_handle_t MyCamera::_Client_Handle;
 usb_device_handle_t MyCamera::_Device_Handle;
 
@@ -26,12 +28,16 @@ MyCamera myCamera;
 void MyCamera::init()
 {
     Serial.println("MyCamera init");
+    xQueue1 = xQueueCreate(10, sizeof(PtpTransfer));
     _usbh_setup(_show_config_desc_full);
 }
 
 void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
 {
-    Serial.println("_camera_transfer_cb");
+    // Serial.println("_camera_transfer_cb");
+
+    static uint32_t dataOffset = 0;
+    static uint32_t total = 0;
 
     if (_Device_Handle == transfer->device_handle)
     {
@@ -50,32 +56,34 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
         }
         else if (transfer->bEndpointAddress == _CameraOut->bEndpointAddress)
         {
-            Serial.printf("transfer sent to %02x: ", transfer->bEndpointAddress);
+            /*Serial.printf("transfer sent to %02x: ", transfer->bEndpointAddress);
             for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
             {
                 Serial.printf("%02x ", p[i]);
             }
-            Serial.println();
+            Serial.println();*/
         }
         else if (transfer->bEndpointAddress == _CameraIn->bEndpointAddress && transfer->status == 0)
         {
             // if (transfer->actual_num_bytes >= 8)
             //{
 
-            Serial.printf("transfer received from %02x: ", transfer->bEndpointAddress);
+            /*Serial.printf("transfer received from %02x: ", transfer->bEndpointAddress);
             for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
             {
                 Serial.printf("%02x ", p[i]);
             }
-            Serial.println();
+            Serial.println();*/
 
             uint16_t container_type = p[4] | (p[5] << 8);
-            switch (container_type)
+            if (container_type == PTP_USB_CONTAINER_COMMAND)
             {
-            case PTP_USB_CONTAINER_COMMAND:
+
                 Serial.println("PTP_USB_CONTAINER_COMMAND");
-                break;
-            case PTP_USB_CONTAINER_DATA:
+            }
+            else if (container_type == PTP_USB_CONTAINER_DATA || total != 0)
+            {
+
                 // Serial.println("PTP_USB_CONTAINER_DATA");
                 {
                     uint16_t operation_code = p[6] | (p[7] << 8);
@@ -94,29 +102,67 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
                             Serial.printf("event(%d): code: %04x, property: %04x\n", i + 1, event_code, property_code);
                         }
                     }
+                    if (transfer->actual_num_bytes > 12 || total != 0)
+                    {
+                        PtpTransfer myTransfer;
+                        memcpy(myTransfer.data, p, transfer->actual_num_bytes);
+                        myTransfer.len = transfer->actual_num_bytes;
+                        if (dataOffset == 0)
+                            total = p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
+                        myTransfer.total = total;
+                        myTransfer.offset = dataOffset;
+                        BaseType_t status = xQueueSend(xQueue1, &myTransfer, 0);
+                        if (status != pdPASS)
+                        {
+                            Serial.println("failed to send to Queue1");
+                        }
+                        /*else
+                        {
+                            Serial.println("send queue data");
+                        }*/
+                        dataOffset += transfer->actual_num_bytes;
+                        if (dataOffset == total)
+                        {
+                            total = 0;
+                        }
+                    }
                 }
-                break;
-            case PTP_USB_CONTAINER_RESPONSE:
+            }
+            else if (container_type == PTP_USB_CONTAINER_RESPONSE)
+            {
                 // Serial.println("PTP_USB_CONTAINER_RESPONSE");
                 {
-                    uint16_t response_code = p[6] | (p[7] << 8);
-                    if (response_code == 0x2001)
+                    total = 0;
+                    dataOffset = 0;
+                    PtpTransfer myTransfer;
+                    memcpy(myTransfer.data, p, transfer->actual_num_bytes);
+                    myTransfer.len = transfer->actual_num_bytes;
+                    BaseType_t status = xQueueSend(xQueue1, &myTransfer, 0);
+                    if (status != pdPASS)
+                    {
+                        Serial.println("failed to send to Queue1");
+                    }
+                    /*else
+                    {
+                        Serial.println("send queue response");
+                    }*/
+                    /*if (response_code == 0x2001)
                     {
                         Serial.println("Response code OK");
                     }
                     else
                     {
                         Serial.printf("Response code error: %04x\n", response_code);
-                    }
+                    }*/
                 }
-                break;
-            case PTP_USB_CONTAINER_EVENT:
+            }
+            else if (container_type == PTP_USB_CONTAINER_EVENT)
+            {
                 Serial.println("PTP_USB_CONTAINER_EVENT");
-                break;
-
-            default:
+            }
+            else
+            {
                 Serial.printf("PTP_USB_CONTAINER_UNDEFINED: %04x\n", container_type);
-                break;
             }
 
             esp_err_t err = usb_host_transfer_submit(transfer);
@@ -409,6 +455,204 @@ void MyCamera::loopUsb()
 }
 
 static uint32_t idTransaction = 0;
+
+void MyCamera::flushQueue()
+{
+    PtpTransfer transfer;
+    uint8_t number = 0;
+    _usbh_task();
+    _usbh_task();
+    while (xQueueReceive(xQueue1, &transfer, 0) == pdTRUE)
+    {
+        number++;
+        _usbh_task();
+        _usbh_task();
+    }
+    if (number)
+        Serial.printf("flush %d message\n", number);
+}
+uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total)
+{
+    uint16_t responseCode = 0;
+    PtpTransfer transfer;
+
+    _usbh_task();
+    _usbh_task();
+
+    uint8_t number = 0;
+    uint32_t pending = 0;
+    unsigned long timerGet = millis();
+
+    while (millis() - timerGet < timeout) // 5200-5000<200
+    {
+        if (xQueueReceive(xQueue1, &transfer, 5) == pdTRUE)
+        {
+            number++;
+            timerGet = millis() - timeout + 50;
+            if (transfer.data[4] == PTP_USB_CONTAINER_DATA || pending != 0)
+            {
+                // Serial.printf("%d+%d=%d/%d\n", transfer.offset, transfer.len, transfer.offset + transfer.len, transfer.total);
+                if (total == 0)
+                {
+                    total = transfer.total;
+                    data = new uint8_t[total];
+                    memset(data, 0, total);
+                }
+                memcpy(data + transfer.offset, transfer.data, transfer.len);
+
+                pending = total - (transfer.offset + transfer.len);
+            }
+            else if (transfer.data[4] == PTP_USB_CONTAINER_RESPONSE)
+            {
+                /*Serial.print("response: ");
+                for (uint8_t i = 0; i < transfer.len; i++)
+                {
+                    Serial.printf("%02x ", transfer.data[i]);
+                }
+                Serial.println();*/
+                responseCode = transfer.data[6] | (transfer.data[7] << 8);
+                /*if (responseCode == 0x2001)
+                {
+                    Serial.printf("responseCode: %04x\n", responseCode);
+                }*/
+                return responseCode;
+            }
+        }
+        _usbh_task();
+    }
+
+    Serial.printf("get %d messages\n", number);
+    return responseCode;
+}
+
+const char *const MyCamera::prNames[] =
+    {
+        msgUndefined,
+        msgBatteryLevel,
+        msgFunctionalMode,
+        msgImageSize,
+        msgCompressionSetting,
+        msgWhiteBalance,
+        msgRGBGain,
+        msgFNumber,
+        msgFocalLength,
+        msgFocusDistance,
+        msgFocusMode,
+        msgExposureMeteringMode,
+        msgFlashMode,
+        msgExposureTime,
+        msgExposureProgramMode,
+        msgExposureIndex,
+        msgExposureBiasCompensation,
+        msgDateTime,
+        msgCaptureDelay,
+        msgStillCaptureMode,
+        msgContrast,
+        msgSharpness,
+        msgDigitalZoom,
+        msgEffectMode,
+        msgBurstNumber,
+        msgBurstInterval,
+        msgTimelapseNumber,
+        msgTimelapseInterval,
+        msgFocusMeteringMode,
+        msgUploadURL,
+        msgArtist,
+        msgCopyrightInfo};
+
+/*void MyCamera::PrintDevProp(uint8_t **pp, uint16_t *pcntdn)
+{
+    uint16_t op = *((uint16_t *)(*pp));
+
+    Serial.print("\r\nDevice Property:\t");
+
+    if ((((op >> 8) & 0xFF) == 0x50) && ((op & 0xFF) <= (PTP_DPC_CopyrightInfo & 0xFF)))
+    {
+        Serial.printf("%04x", op);
+        Serial.print("\t");
+        Serial.print(prNames[(op & 0xFF)]);
+        Serial.print("\r\n");
+    }
+    else
+    {
+        Serial.printf("%04x", op);
+        Serial.print(" (Vendor defined)\r\n");
+    }
+    (*pp) += 2;
+    (*pcntdn) -= 2;
+}*/
+
+void MyCamera::getDevProps()
+{
+    uint16_t prefix[3] = {/* 0x5000 */ 0xD400, 0xD300, 0x5000};
+
+    for (uint8_t i = 0; i < 3; i++)
+    {
+        for (uint8_t j = 0; j < 128; j++)
+        {
+
+            idTransaction++;
+
+            uint8_t bufEvent[16] = {};
+            memset(_CameraOut->data_buffer, 0, 16);
+            _CameraOut->num_bytes = 16;
+            _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
+            _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
+            _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
+            _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
+            _CameraOut->data_buffer[4] = (PTP_USB_CONTAINER_COMMAND & 0xff);
+            _CameraOut->data_buffer[5] = (PTP_USB_CONTAINER_COMMAND & 0xff00) >> 8;
+            _CameraOut->data_buffer[6] = 0x14;
+            _CameraOut->data_buffer[7] = 0x10;
+            _CameraOut->data_buffer[8] = (idTransaction & 0xff);
+            _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
+            _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
+            _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
+            _CameraOut->data_buffer[12] = ((prefix[i] | j) & 0xff);
+            _CameraOut->data_buffer[13] = ((prefix[i] | j) & 0xff00) >> 8;
+            _CameraOut->data_buffer[14] = 0;
+            _CameraOut->data_buffer[15] = 0;
+
+            flushQueue();
+            esp_err_t err = usb_host_transfer_submit(_CameraOut);
+
+            if (err != ESP_OK)
+            {
+                ESP_LOGI("", "(open Session) usb_host_transfer_submit In fail: %x", err);
+            }
+
+            uint8_t *data = NULL;
+            uint32_t total = 0;
+            uint16_t responseCode = getResponseCode(200, data, total);
+
+            if (data != NULL)
+            {
+                Serial.printf("responseCode: %04x for command: %04x\n", responseCode, (prefix[i] | j));
+                for (uint8_t i = 0; i < total; i++)
+                {
+                    Serial.printf("%02x ", data[i]);
+                    if ((i + 1) % 16 == 0)
+                    {
+                        Serial.println();
+                    }
+                }
+                Serial.println();
+
+                // uint8_t *dataP = data + 12;
+                // uint16_t cntdn = total - 12;
+                devProp.Decode(total, data);
+                // PrintDevProp(&dataP, &cntdn);
+                delete[] data;
+            }
+            /*if (responseCode == PTP_RC_OK)
+            {
+                Serial.printf("getDevProps: %04x\n", (prefix[i] | j));
+            }*/
+        }
+    }
+
+    Serial.println("getDevProps DONE !");
+}
 
 void MyCamera::checkEvent()
 {

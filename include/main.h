@@ -2,7 +2,8 @@
 #define main_h
 #include <Arduino.h>
 #include "usb/usb_host.h"
-
+#include "ptpconst.h"
+#include "devprop.h"
 #include "myCamera.h"
 
 void show_dev_desc(const usb_device_desc_t *dev_desc);
@@ -19,5 +20,5 @@ extern char AzertyArraySpe[8][8];
 extern char AzertyArray[102][8];
 
 extern MyCamera myCamera;
-
+extern DevProp devProp;
 #endif

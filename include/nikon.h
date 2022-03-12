@@ -1,10 +1,12 @@
 #include "Arduino.h"
+#ifndef NIKON_DEF
+#define NIKON_DEF
 
-template <class ValueType, const uint8_t TitleSize> 
+template <class ValueType, const uint8_t TitleSize>
 struct ValueTitle
 {
-	ValueType	value;
-	const char	title[TitleSize];
+	ValueType value;
+	const char title[TitleSize];
 };
 
 // Nikon Extension Operation Codes
@@ -170,3 +172,15 @@ struct ValueTitle
 #define NK_DPC_LowLight 0xD1B0
 #define NK_DPC_FlashOpen 0xD1C0
 #define NK_DPC_FlashCharged 0xD1C1
+
+typedef uint16_t ValueType;
+
+const ValueType ValueTypeAperture = 0x0001;
+
+class Nikon
+{
+public:
+	static void PrintValue(const ValueType ValueType, const uint8_t *data, const uint32_t len);
+};
+
+#endif

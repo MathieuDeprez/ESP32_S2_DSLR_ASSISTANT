@@ -141,15 +141,15 @@ void loop()
       openSession = true;
       myCamera.openSession();
     }
-    else if (!getDevProp)
+    /*else if (!getDevProp)
     {
       getDevProp = true;
       myCamera.getDevProps();
-    }
+    }*/
     else
     {
-      // myCamera.getAperture();
-      myCamera.checkEvent();
+      myCamera.getAperture();
+      // myCamera.checkEvent();
     }
   }
   // Usb.Task();

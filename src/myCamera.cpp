@@ -495,7 +495,7 @@ uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &t
             timerGet = millis() - timeout + 100;
             if (transfer.data[4] == PTP_USB_CONTAINER_DATA || pending != 0)
             {
-                // Serial.printf("%d+%d=%d/%d\n", transfer.offset, transfer.len, transfer.offset + transfer.len, transfer.total);
+                Serial.printf("%d+%d=%d/%d\n", transfer.offset, transfer.len, transfer.offset + transfer.len, transfer.total);
                 if (total == 0)
                 {
                     total = transfer.total;
@@ -835,36 +835,27 @@ void MyCamera::openSession()
 
 void MyCamera::getAperture()
 {
-    uint32_t param = PTP_DPC_ExposureTime;
+    Serial.println("getAperture()");
+    uint32_t param = PTP_DPC_FNumber;
     Operation(PTP_OC_GetDevicePropValue, 1, &param);
-    /*idTransaction++;
 
-    uint8_t bufEvent[16] = {};
-    memset(_CameraOut->data_buffer, 0, 16);
-    _CameraOut->num_bytes = 16;
-    _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
-    _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
-    _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
-    _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
-    _CameraOut->data_buffer[4] = 0x01;
-    _CameraOut->data_buffer[5] = 0x00;
-    _CameraOut->data_buffer[6] = 0x15;
-    _CameraOut->data_buffer[7] = 0x10;
-    _CameraOut->data_buffer[8] = (idTransaction & 0xff);
-    _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-    _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-    _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
-    _CameraOut->data_buffer[12] = 0x0D;
-    _CameraOut->data_buffer[13] = 0x50;
-    _CameraOut->data_buffer[14] = 0;
-    _CameraOut->data_buffer[15] = 0;
+    uint8_t *data = NULL;
+    uint32_t total = 0;
+    uint16_t responseCode = getResponseCode(200, data, total);
 
-    esp_err_t err = usb_host_transfer_submit(_CameraOut);
-
-    if (err != ESP_OK)
+    if (responseCode == PTP_RC_OK && data != NULL)
     {
-        ESP_LOGI("", "(aperture) usb_host_transfer_submit In fail: %x", err);
-    }*/
+        Nikon::PrintValue(ValueTypeAperture, data, total);
+    }
+    else
+    {
+        Serial.println("Error getting Aperture");
+    }
+
+    if (data != NULL)
+    {
+        delete[] data;
+    }
 }
 
 void MyCamera::_client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg)

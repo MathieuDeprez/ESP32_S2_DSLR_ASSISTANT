@@ -37,9 +37,9 @@ const ValueTitle<uint8_t, 5> FocusModeTitles[] =
 const ValueTitle<uint8_t, 6> CompressionTitles[] =
 	{
 		{0x00, "BASIC"},
-		{0x01, "NORM "},
-		{0x02, "FINE "},
-		{0x03, "RAW  "},
+		{0x01, "NORM"},
+		{0x02, "FINE"},
+		{0x03, "RAW"},
 		{0x04, "RAW+B"},
 };
 
@@ -102,16 +102,16 @@ const ValueTitle<uint32_t, 5> ShutterSpeedTitles[] =
 
 const ValueTitle<uint16_t, 5> IsoTitles[] =
 	{
-		{0x0064, " 100"},
-		{0x007D, " 125"},
-		{0x00A0, " 160"},
-		{0x00C8, " 200"},
-		{0x00FA, " 250"},
-		{0x0140, " 320"},
-		{0x0190, " 400"},
-		{0x01F4, " 500"},
-		{0x0280, " 640"},
-		{0x0320, " 800"},
+		{0x0064, "100"},
+		{0x007D, "125"},
+		{0x00A0, "160"},
+		{0x00C8, "200"},
+		{0x00FA, "250"},
+		{0x0140, "320"},
+		{0x0190, "400"},
+		{0x01F4, "500"},
+		{0x0280, "640"},
+		{0x0320, "800"},
 		{0x03E8, "1000"},
 		{0x04E2, "1250"},
 		{0x0640, "1600"},
@@ -175,3 +175,39 @@ const ValueTitle<uint16_t, 4> WbTitles[] =
 		{0x8011, "Shd"}, // Shade
 		{0x8013, "PRE"}, // Preset
 };
+
+void Nikon::PrintValue(const ValueType valueType, const uint8_t *data, const uint32_t len)
+{
+	Serial.println("PrintValue()");
+	switch (valueType)
+	{
+	case ValueTypeAperture:
+	{
+		/*for (uint32_t i = 0; i < len; i++)
+		{
+			Serial.printf("%02x ", data[i]);
+		}
+		Serial.println();*/
+
+		uint16_t *apertureValue = (uint16_t *)&data[12];
+		//Serial.printf("%04x\n", *apertureValue);
+		bool found = false;
+		for (uint8_t i = 0; i < sizeof(ApertureTitles) / sizeof(ApertureTitles[0]); i++)
+		{
+			if (ApertureTitles[i].value == *apertureValue)
+			{
+				Serial.printf("Aperture: F%s\n", ApertureTitles[i].title);
+				found = true;
+				break;
+			}
+		}
+		if(!found){
+			Serial.printf("Aperture title not found.");
+		}
+	}
+	break;
+
+	default:
+		break;
+	}
+}

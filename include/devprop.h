@@ -2,6 +2,7 @@
 #define __DEVPROPPARSER_H__
 
 #include <ptpconst.h>
+#include "nikon.h"
 
 // Device properties
 const char msgUndefined[] = "Undefined";
@@ -36,6 +37,17 @@ const char msgFocusMeteringMode[] = "FocusMeteringMode";
 const char msgUploadURL[] = "UploadURL";
 const char msgArtist[] = "Artist";
 const char msgCopyrightInfo[] = "CopyrightInfo";
+const char msgExpoCompensation[] = "ExpoCompensation";
+const char msgCameraModel[] = "CameraModel";
+const char msgDispAv[] = "DispAv";
+const char msgLongExposureNoiseReduction[] = "LongExposureNoiseReduction";
+const char msgNoCFCard[] = "NoCFCard";
+const char msgLensID[] = "LensID";
+const char msgFocalLengthMin[] = "FocalLengthMin";
+const char msgFocalLengthMax[] = "FocalLengthMax";
+const char msgACPower[] = "ACPower";
+const char msgAutofocusMode[] = "AutofocusMode";
+const char msgAFAssist[] = "AFAssist";
 
 // Data Types
 const char msgUNDEF[] = "UNDEF";
@@ -63,21 +75,19 @@ const char msgSTR[] = "STR";
 
 class DevProp
 {
+    typedef struct
+    {
+        uint16_t op;
+        const char *desc;
+    } DevPropDesc;
+
+    static DevPropDesc devPropDesc[];
     static const char *const dtNames1[];
     static const char *const dtNames2[];
     static const char *const prNames[];
 
-    // uint8_t nStage;
-    // uint8_t enStage;
     uint16_t dataType;
-    // uint8_t formFlag;
     uint8_t bytesSize;
-    // MultiValueBuffer theBuffer;
-    // uint8_t varBuffer[16];
-    // uint16_t enLen;
-    // uint16_t enLenCntdn;
-
-    // MultiByteValueParser valParser;
 
     void PrintDevProp(uint8_t **pp, uint16_t *pcntdn);
     void PrintDataType(uint8_t **pp, uint16_t *pcntdn);
@@ -88,69 +98,6 @@ class DevProp
     bool ParseEnumSingle(uint8_t **pp, uint16_t *pcntdn);
     bool ParseEnumArray(uint8_t **pp, uint16_t *pcntdn);
 
-    /*static void PrintChar(const MultiValueBuffer *const p,
-                          uint32_t count __attribute__((unused)),
-                          const void *me __attribute__((unused)))
-    {
-        if (((unsigned char *)p->pValue)[0])
-            Serial.print(((unsigned char *)p->pValue)[0]);
-    };
-    static void PrintByte(const MultiValueBuffer *const p, uint32_t count,
-                          const void *me __attribute__((unused)))
-    {
-        if (count)
-            E_Notify(PSTR(","), 0x80);
-        PrintHex<uint8_t>(((uint8_t *)p->pValue)[0], 0x80);
-    };
-    static void PrintTwoBytes(const MultiValueBuffer *const p,
-                              uint32_t count,
-                              const void *me __attribute__((unused)))
-    {
-        if (count)
-            E_Notify(PSTR(","), 0x80);
-        PrintHex<uint16_t>(((uint16_t *)p->pValue)[0], 0x80);
-    };
-    static void PrintFourBytes(const MultiValueBuffer *const p,
-                               uint32_t count, const void *me __attribute__((unused)))
-    {
-        if (count)
-            E_Notify(PSTR(","), 0x80);
-        PrintHex<uint32_t>(((uint32_t *)p->pValue)[0], 0x80);
-    };
-    static void PrintEightBytes(const MultiValueBuffer *const p,
-                                uint32_t count, const void *me __attribute__((unused)))
-    {
-        if (count)
-            E_Notify(PSTR(","), 0x80);
-        for (uint8_t i = p->valueSize; i; i--)
-            PrintHex<uint8_t>(((uint8_t *)p->pValue)[i - 1], 0x80);
-    };
-    static void PrintEnumValue(const MultiValueBuffer *const p,
-                               uint32_t count, const void *me __attribute__((unused)))
-    {
-        if (count)
-            Serial.print(", ");
-
-        switch (((MultiValueBuffer *)p)->valueSize)
-        {
-        case 1:
-            PrintHex<uint8_t>(*((uint8_t *)p->pValue), 0x80);
-            break;
-        case 2:
-            PrintHex<uint16_t>(*((uint16_t *)p->pValue), 0x80);
-            break;
-        case 4:
-            PrintHex<uint32_t>(*((uint32_t *)p->pValue), 0x80);
-            break;
-        default:
-            for (uint8_t i = p->valueSize; i; i--)
-                PrintHex<uint8_t>(((uint8_t *)p->pValue)[i - 1], 0x80);
-        }
-        count++;
-    };
-
-    PTPListParser enumParser;
-*/
     uint8_t GetDataSize();
 
 public:

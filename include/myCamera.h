@@ -24,6 +24,7 @@ public:
     void openSession();
     void getDevProps();
     void flushQueue();
+    void Operation(uint16_t opCode, uint8_t nbrParams, uint32_t *params);
     // void PrintDevProp(uint8_t **pp, uint16_t *pcntdn);
     uint16_t getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total);
     static bool isCameraReady;

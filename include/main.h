@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "usb/usb_host.h"
 #include "ptpconst.h"
+#include "nikon.h"
 #include "devprop.h"
 #include "myCamera.h"
 

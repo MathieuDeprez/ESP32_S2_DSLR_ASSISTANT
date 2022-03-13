@@ -32,50 +32,52 @@ const char *const DevProp::dtNames2[] =
 
 DevProp::DevPropDesc DevProp::devPropDesc[] =
     {
-        {PTP_DPC_Undefined, msgUndefined},
-        {PTP_DPC_BatteryLevel, msgBatteryLevel},
-        {PTP_DPC_FunctionalMode, msgFunctionalMode},
-        {PTP_DPC_ImageSize, msgImageSize},
-        {PTP_DPC_CompressionSetting, msgCompressionSetting},
-        {PTP_DPC_WhiteBalance, msgWhiteBalance},
-        {PTP_DPC_RGBGain, msgRGBGain},
-        {PTP_DPC_FNumber, msgFNumber},
-        {PTP_DPC_FocalLength, msgFocalLength},
-        {PTP_DPC_FocusDistance, msgFocusDistance},
-        {PTP_DPC_FocusMode, msgFocusMode},
-        {PTP_DPC_ExposureMeteringMode, msgExposureMeteringMode},
-        {PTP_DPC_FlashMode, msgFlashMode},
-        {PTP_DPC_ExposureTime, msgExposureTime},
-        {PTP_DPC_ExposureProgramMode, msgExposureProgramMode},
-        {PTP_DPC_ExposureIndex, msgExposureIndex},
-        {PTP_DPC_ExposureBiasCompensation, msgExposureBiasCompensation},
-        {PTP_DPC_DateTime, msgDateTime},
-        {PTP_DPC_CaptureDelay, msgCaptureDelay},
-        {PTP_DPC_StillCaptureMode, msgStillCaptureMode},
-        {PTP_DPC_Contrast, msgContrast},
-        {PTP_DPC_Sharpness, msgSharpness},
-        {PTP_DPC_DigitalZoom, msgDigitalZoom},
-        {PTP_DPC_EffectMode, msgEffectMode},
-        {PTP_DPC_BurstNumber, msgBurstNumber},
-        {PTP_DPC_BurstInterval, msgBurstInterval},
-        {PTP_DPC_TimelapseNumber, msgTimelapseNumber},
-        {PTP_DPC_TimelapseInterval, msgTimelapseInterval},
-        {PTP_DPC_FocusMeteringMode, msgFocusMeteringMode},
-        {PTP_DPC_UploadURL, msgUploadURL},
-        {PTP_DPC_Artist, msgArtist},
-        {PTP_DPC_CopyrightInfo, msgCopyrightInfo},
-        {PS_DPC_AFMode, msgAutofocusMode},
-        {PS_DPC_ExpCompensation, msgExpoCompensation},
-        {PS_DPC_CameraModel, msgCameraModel},
-        {PS_DPC_DispAv, msgDispAv},
-        {NK_DPC_LongExposureNoiseReduction, msgLongExposureNoiseReduction},
-        {NK_DPC_NoCFCard, msgNoCFCard},
-        {NK_DPC_LensID, msgLensID},
-        {NK_DPC_FocalLengthMin, msgFocalLengthMin},
-        {NK_DPC_FocalLengthMax, msgFocalLengthMax},
-        {NK_DPC_ACPower, msgACPower},
-        {NK_DPC_AutofocusMode, msgAutofocusMode},
-        {NK_DPC_AFAssist, msgAFAssist},
+        {PTP_DPC_Undefined, msgUndefined, ValueTypeNone},
+        {PTP_DPC_BatteryLevel, msgBatteryLevel, ValueTypeNone},
+        {PTP_DPC_FunctionalMode, msgFunctionalMode, ValueTypeNone},
+        {PTP_DPC_ImageSize, msgImageSize, ValueTypeNone},
+        {PTP_DPC_CompressionSetting, msgCompressionSetting, ValueTypeNone},
+        {PTP_DPC_WhiteBalance, msgWhiteBalance, ValueTypeNone},
+        {PTP_DPC_RGBGain, msgRGBGain, ValueTypeNone},
+        {PTP_DPC_FNumber, msgFNumber, ValueTypeAperture},
+        {PTP_DPC_FocalLength, msgFocalLength, ValueTypeNone},
+        {PTP_DPC_FocusDistance, msgFocusDistance, ValueTypeNone},
+        {PTP_DPC_FocusMode, msgFocusMode, ValueTypeNone},
+        {PTP_DPC_ExposureMeteringMode, msgExposureMeteringMode, ValueTypeNone},
+        {PTP_DPC_FlashMode, msgFlashMode, ValueTypeNone},
+        {PTP_DPC_ExposureTime, msgExposureTime, ValueTypeExposureTime},
+        {NK_DPC_ExposureTime, msgExposureTime, ValueTypeNone},
+        {PTP_DPC_ExposureProgramMode, msgExposureProgramMode, ValueTypeNone},
+        {PTP_DPC_ExposureIndex, msgExposureIndex, ValueTypeNone},
+        {PTP_DPC_ExposureBiasCompensation, msgExposureBiasCompensation, ValueTypeNone},
+        {PTP_DPC_DateTime, msgDateTime, ValueTypeNone},
+        {PTP_DPC_CaptureDelay, msgCaptureDelay, ValueTypeNone},
+        {PTP_DPC_StillCaptureMode, msgStillCaptureMode, ValueTypeNone},
+        {PTP_DPC_Contrast, msgContrast, ValueTypeNone},
+        {PTP_DPC_Sharpness, msgSharpness, ValueTypeNone},
+        {PTP_DPC_DigitalZoom, msgDigitalZoom, ValueTypeNone},
+        {PTP_DPC_EffectMode, msgEffectMode, ValueTypeNone},
+        {PTP_DPC_BurstNumber, msgBurstNumber, ValueTypeNone},
+        {PTP_DPC_BurstInterval, msgBurstInterval, ValueTypeNone},
+        {PTP_DPC_TimelapseNumber, msgTimelapseNumber, ValueTypeNone},
+        {PTP_DPC_TimelapseInterval, msgTimelapseInterval, ValueTypeNone},
+        {PTP_DPC_FocusMeteringMode, msgFocusMeteringMode, ValueTypeNone},
+        {PTP_DPC_UploadURL, msgUploadURL, ValueTypeNone},
+        {PTP_DPC_Artist, msgArtist, ValueTypeNone},
+        {PTP_DPC_CopyrightInfo, msgCopyrightInfo, ValueTypeNone},
+        {PS_DPC_AFMode, msgAutofocusMode, ValueTypeNone},
+        {PS_DPC_ExpCompensation, msgExpoCompensation, ValueTypeNone},
+        {PS_DPC_CameraModel, msgCameraModel, ValueTypeNone},
+        {PS_DPC_DispAv, msgDispAv, ValueTypeNone},
+        {NK_DPC_LongExposureNoiseReduction, msgLongExposureNoiseReduction, ValueTypeNone},
+        {NK_DPC_NoCFCard, msgNoCFCard, ValueTypeNone},
+        {NK_DPC_LensID, msgLensID, ValueTypeNone},
+        {NK_DPC_FocalLengthMin, msgFocalLengthMin, ValueTypeNone},
+        {NK_DPC_FocalLengthMax, msgFocalLengthMax, ValueTypeNone},
+        {NK_DPC_ACPower, msgACPower, ValueTypeNone},
+        {NK_DPC_AutofocusMode, msgAutofocusMode, ValueTypeNone},
+        {NK_DPC_AFAssist, msgAFAssist, ValueTypeNone},
+        {PTP_DPC_NIKON_LiveViewStatus, msgLiveView, ValueTypeLiveView},
 
 };
 
@@ -157,20 +159,16 @@ void DevProp::PrintDevProp(uint8_t **pp, uint16_t *pcntdn)
     }
     else
     {*/
-    bool descFound = false;
-    for (uint16_t i = 0; i < sizeof(devPropDesc) / sizeof(devPropDesc[0]); i++)
+
+    DevPropDesc *propDesc = getDesc(op);
+    if (propDesc != NULL)
     {
-        if (devPropDesc[i].op == op)
-        {
-            Serial.printf("%04x", op);
-            Serial.print("\t");
-            Serial.print(devPropDesc[i].desc);
-            Serial.print("\r\n");
-            descFound = true;
-            break;
-        }
+        Serial.printf("%04x", op);
+        Serial.print("\t");
+        Serial.print(propDesc->desc);
+        Serial.print("\r\n");
     }
-    if (!descFound)
+    else
     {
         Serial.printf("%04x", op);
         Serial.print(" (Vendor defined)\r\n");
@@ -178,6 +176,23 @@ void DevProp::PrintDevProp(uint8_t **pp, uint16_t *pcntdn)
     //}
     (*pp) += 2;
     (*pcntdn) -= 2;
+}
+
+DevProp::DevPropDesc *DevProp::getDesc(uint16_t op)
+{
+    bool descFound = false;
+    for (uint16_t i = 0; i < sizeof(devPropDesc) / sizeof(devPropDesc[0]); i++)
+    {
+        if (devPropDesc[i].op == op)
+        {
+            /*Serial.printf("%04x", op);
+            Serial.print("\t");
+            Serial.print(devPropDesc[i].desc);
+            Serial.print("\r\n");*/
+            return &devPropDesc[i];
+        }
+    }
+    return NULL;
 }
 
 void DevProp::PrintGetSet(uint8_t **pp, uint16_t *pcntdn)

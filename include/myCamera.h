@@ -21,7 +21,11 @@ public:
     void loopUsb();
     void checkEvent();
     void getAperture();
+    uint32_t getDevProp(DevProp::DevPropDesc propDesc);
     void openSession();
+    void getImage();
+    bool getLiveViewStatus();
+    void setLiveViewStatus(bool status);
     void getDevProps();
     void flushQueue();
     void Operation(uint16_t opCode, uint8_t nbrParams, uint32_t *params);

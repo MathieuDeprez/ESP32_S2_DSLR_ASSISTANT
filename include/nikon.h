@@ -24,6 +24,7 @@ struct ValueTitle
 #define NK_OC_DeviceReady 0x90C8
 #define NK_OC_CaptureInSDRAM 0x90CB
 #define NK_OC_GetDevicePTPIPInfo 0x90E0
+#define PTP_DPC_NIKON_LiveViewStatus 0xD1A2
 
 #define PTP_OC_NIKON_GetPreviewImg 0x9200
 #define PTP_OC_NIKON_StartLiveView 0x9201
@@ -175,7 +176,11 @@ struct ValueTitle
 
 typedef uint16_t ValueType;
 
+const ValueType ValueTypeNone = 0x0000;
 const ValueType ValueTypeAperture = 0x0001;
+const ValueType ValueTypeEvent = 0x0002;
+const ValueType ValueTypeExposureTime = 0x0003;
+const ValueType ValueTypeLiveView = 0x0004;
 
 class Nikon
 {

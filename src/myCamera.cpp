@@ -47,12 +47,12 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
 
         if (transfer->bEndpointAddress == _CameraInterrupt->bEndpointAddress)
         {
-            Serial.printf("callback interrupt. in_xfer: %d, number: %d\n", in_xfer, transfer->actual_num_bytes);
+            /*Serial.printf("callback interrupt. in_xfer: %d, number: %d\n", in_xfer, transfer->actual_num_bytes);
             for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
             {
                 Serial.printf("%02x ", p[i]);
             }
-            Serial.println();
+            Serial.println();*/
         }
         else if (transfer->bEndpointAddress == _CameraOut->bEndpointAddress)
         {
@@ -86,9 +86,9 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
                     if (operation_code == 0x1015)
                     {
                         uint32_t value = p[12] | (p[13] << 8) | (p[14] << 16) | (p[15] << 24);
-                        Serial.printf("PTP_OC_GetDevicePropValue with value: %08x\n", value);
+                        // Serial.printf("PTP_OC_GetDevicePropValue with value: %08x\n", value);
                     }
-                    else if (operation_code == 0x90c7)
+                    /*else if (operation_code == 0x90c7)
                     {
                         uint8_t number_of_events = p[12] | (p[13] << 8);
                         for (uint8_t i = 0; i < number_of_events; i++)
@@ -97,7 +97,7 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
                             uint16_t property_code = p[16 + i * 6] | (p[17 + i * 6] << 8);
                             Serial.printf("event(%d): code: %04x, property: %04x\n", i + 1, event_code, property_code);
                         }
-                    }
+                    }*/
                     if (transfer->actual_num_bytes > 12 || total != 0)
                     {
                         PtpTransfer myTransfer;
@@ -136,7 +136,7 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
             }
             else if (container_type == PTP_USB_CONTAINER_RESPONSE)
             {
-                // Serial.println("PTP_USB_CONTAINER_RESPONSE");
+                Serial.println("PTP_USB_CONTAINER_RESPONSE");
                 {
                     total = 0;
                     dataOffset = 0;
@@ -495,11 +495,16 @@ uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &t
             timerGet = millis() - timeout + 100;
             if (transfer.data[4] == PTP_USB_CONTAINER_DATA || pending != 0)
             {
-                Serial.printf("%d+%d=%d/%d\n", transfer.offset, transfer.len, transfer.offset + transfer.len, transfer.total);
+                // Serial.printf("%d+%d=%d/%d\n", transfer.offset, transfer.len, transfer.offset + transfer.len, transfer.total);
                 if (total == 0)
                 {
                     total = transfer.total;
                     data = new uint8_t[total];
+                    if (data == NULL)
+                    {
+                        Serial.printf("new failed: %d !!!!", total);
+                        delay(5000);
+                    }
                     memset(data, 0, total);
                 }
                 memcpy(data + transfer.offset, transfer.data, transfer.len);
@@ -658,34 +663,6 @@ void MyCamera::getDevProps()
 
             uint32_t param = (prefix[i] | j);
             Operation(PTP_OC_GetDevicePropDesc, 1, &param);
-            /*idTransaction++;
-
-            uint8_t bufEvent[16] = {};
-            memset(_CameraOut->data_buffer, 0, 16);
-            _CameraOut->num_bytes = 16;
-            _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
-            _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
-            _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
-            _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
-            _CameraOut->data_buffer[4] = (PTP_USB_CONTAINER_COMMAND & 0xff);
-            _CameraOut->data_buffer[5] = (PTP_USB_CONTAINER_COMMAND & 0xff00) >> 8;
-            _CameraOut->data_buffer[6] = 0x14;
-            _CameraOut->data_buffer[7] = 0x10;
-            _CameraOut->data_buffer[8] = (idTransaction & 0xff);
-            _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-            _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-            _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
-            _CameraOut->data_buffer[12] = ((prefix[i] | j) & 0xff);
-            _CameraOut->data_buffer[13] = ((prefix[i] | j) & 0xff00) >> 8;
-            _CameraOut->data_buffer[14] = 0;
-            _CameraOut->data_buffer[15] = 0;
-
-            esp_err_t err = usb_host_transfer_submit(_CameraOut);
-
-            if (err != ESP_OK)
-            {
-                ESP_LOGI("", "(open Session) usb_host_transfer_submit In fail: %x", err);
-            }*/
 
             uint8_t *data = NULL;
             uint32_t total = 0;
@@ -693,28 +670,10 @@ void MyCamera::getDevProps()
 
             if (data != NULL)
             {
-                /*Serial.printf("responseCode: %04x for command: %04x\n", responseCode, (prefix[i] | j));
-                for (uint8_t i = 0; i < total; i++)
-                {
-                    Serial.printf("%02x ", data[i]);
-                    if ((i + 1) % 16 == 0)
-                    {
-                        Serial.println();
-                    }
-                }
-                Serial.println();*/
-
-                // uint8_t *dataP = data + 12;
-                // uint16_t cntdn = total - 12;
                 devProp.Decode(total, data);
                 propCount++;
-                // PrintDevProp(&dataP, &cntdn);
                 delete[] data;
             }
-            /*if (responseCode == PTP_RC_OK)
-            {
-                Serial.printf("getDevProps: %04x\n", (prefix[i] | j));
-            }*/
         }
     }
 
@@ -769,74 +728,143 @@ void MyCamera::Operation(uint16_t opCode, uint8_t nbrParams, uint32_t *params)
     }
 }
 
+void MyCamera::getImage()
+{
+    static unsigned long timerGetImage = millis();
+    static bool liveViewStatus = getLiveViewStatus();
+    if (liveViewStatus)
+    {
+        Operation(PTP_OC_NIKON_GetLiveViewImg, 0, NULL);
+
+        uint8_t *data = NULL;
+        uint32_t total = 0;
+        uint16_t responseCode = getResponseCode(200, data, total);
+        Serial.printf("total Image LiveView: %d\n", total);
+
+        if (responseCode == PTP_RC_OK && data != NULL)
+        {
+            /*Serial.println("LiveView image:");
+            for (uint32_t i = 0; i < total; i++)
+            {
+                Serial.printf("%02x", data[i]);
+                if ((i + 1) % 32 == 0)
+                {
+                    Serial.println();
+                }
+            }
+            Serial.println();*/
+            Serial.printf("image received in %lums.\n", millis() - timerGetImage);
+            timerGetImage = millis();
+        }
+        else
+        {
+            Serial.println("Error getting liveView image");
+        }
+
+        if (data != NULL)
+        {
+            delete[] data;
+        }
+    }
+    else
+    {
+        setLiveViewStatus(1);
+        liveViewStatus = getLiveViewStatus();
+    }
+}
+
+bool MyCamera::getLiveViewStatus()
+{
+    DevProp::DevPropDesc propDesc = *DevProp::getDesc(PTP_DPC_NIKON_LiveViewStatus);
+    uint32_t valueReturned = getDevProp(propDesc);
+    uint8_t liveViewStatus = *(uint8_t *)&valueReturned;
+    return liveViewStatus;
+}
+
+void MyCamera::setLiveViewStatus(bool status)
+{
+    Serial.printf("Setting liveView to %d\n", status);
+    uint16_t opCode = status ? PTP_OC_NIKON_StartLiveView : PTP_OC_NIKON_EndLiveView;
+    Operation(PTP_OC_NIKON_StartLiveView, 0, NULL);
+    uint8_t *data = NULL;
+    uint32_t total = 0;
+    uint16_t responseCode = getResponseCode(1000, data, total);
+
+    if (responseCode != PTP_RC_OK)
+    {
+        Serial.printf("fail to setLiveView %04x\n", responseCode);
+    }
+    if (data != NULL)
+    {
+        delete[] data;
+    }
+}
+
 void MyCamera::checkEvent()
 {
     Operation(NK_OC_CheckEvent, 0, NULL);
+    uint8_t *data = NULL;
+    uint32_t total = 0;
+    uint16_t responseCode = getResponseCode(200, data, total);
 
-    /*idTransaction++;
-
-    uint8_t bufEvent[24] = {};
-    memset(_CameraOut->data_buffer, 0, 24);
-    _CameraOut->num_bytes = 12;
-    _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
-    _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
-    _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
-    _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
-    _CameraOut->data_buffer[4] = (PTP_USB_CONTAINER_COMMAND & 0xff);
-    _CameraOut->data_buffer[5] = (PTP_USB_CONTAINER_COMMAND & 0xff00) >> 8;
-    _CameraOut->data_buffer[6] = 0xC7;
-    _CameraOut->data_buffer[7] = 0x90;
-    _CameraOut->data_buffer[8] = (idTransaction & 0xff);
-    _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-    _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-    _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
-
-    esp_err_t err = usb_host_transfer_submit(_CameraOut);
-
-    if (err != ESP_OK)
+    if (responseCode == PTP_RC_OK && data != NULL)
     {
-        ESP_LOGI("", "(event) usb_host_transfer_submit In fail: %x", err);
-    }*/
+        Nikon::PrintValue(ValueTypeEvent, data, total);
+    }
+    else
+    {
+        Serial.println("Error getting Event");
+    }
+
+    if (data != NULL)
+    {
+        delete[] data;
+    }
 }
 
 void MyCamera::openSession()
 {
     uint32_t param = 1;
     Operation(PTP_OC_OpenSession, 1, &param);
-    /*idTransaction = 0;
+}
 
-    uint8_t bufEvent[16] = {};
-    memset(_CameraOut->data_buffer, 0, 16);
-    _CameraOut->num_bytes = 16;
-    _CameraOut->data_buffer[0] = (_CameraOut->num_bytes & 0xff);
-    _CameraOut->data_buffer[1] = (_CameraOut->num_bytes & 0xff00) >> 8;
-    _CameraOut->data_buffer[2] = (_CameraOut->num_bytes & 0xff0000) >> 16;
-    _CameraOut->data_buffer[3] = (_CameraOut->num_bytes & 0xff000000) >> 24;
-    _CameraOut->data_buffer[4] = 0x01;
-    _CameraOut->data_buffer[5] = 0x00;
-    _CameraOut->data_buffer[6] = 0x02;
-    _CameraOut->data_buffer[7] = 0x10;
-    _CameraOut->data_buffer[8] = (idTransaction & 0xff);
-    _CameraOut->data_buffer[9] = (idTransaction & 0xff00) >> 8;
-    _CameraOut->data_buffer[10] = (idTransaction & 0xff0000) >> 16;
-    _CameraOut->data_buffer[11] = (idTransaction & 0xff000000) >> 24;
-    _CameraOut->data_buffer[12] = 0x01;
-    _CameraOut->data_buffer[13] = 0x00;
-    _CameraOut->data_buffer[14] = 0;
-    _CameraOut->data_buffer[15] = 0;
+uint32_t MyCamera::getDevProp(DevProp::DevPropDesc propDesc)
+{
+    uint32_t param = propDesc.op;
+    Operation(PTP_OC_GetDevicePropValue, 1, &param);
+    uint8_t *data = NULL;
+    uint32_t total = 0;
+    uint16_t responseCode = getResponseCode(200, data, total);
 
-    esp_err_t err = usb_host_transfer_submit(_CameraOut);
-
-    if (err != ESP_OK)
+    uint32_t data32 = 0;
+    if (total > 12)
     {
-        ESP_LOGI("", "(open Session) usb_host_transfer_submit In fail: %x", err);
-    }*/
+        for (uint8_t i = 0; i < total - 12; i++)
+        {
+            ((uint8_t *)&data32)[i] = data[12 + i];
+        }
+    }
+    if (responseCode == PTP_RC_OK && data != NULL)
+    {
+        Nikon::PrintValue(propDesc.type, data, total);
+    }
+    else
+    {
+        Serial.printf("Error getting prop: %04x, responseCode: %04x\n", propDesc.op, responseCode);
+    }
+    if (data != NULL)
+    {
+        delete[] data;
+    }
+    return data32;
 }
 
 void MyCamera::getAperture()
 {
     Serial.println("getAperture()");
-    uint32_t param = PTP_DPC_FNumber;
+    DevProp::DevPropDesc *propDesc = DevProp::getDesc(PTP_DPC_FNumber);
+    getDevProp(*propDesc);
+    /*uint32_t param = PTP_DPC_FNumber;
     Operation(PTP_OC_GetDevicePropValue, 1, &param);
 
     uint8_t *data = NULL;
@@ -855,7 +883,7 @@ void MyCamera::getAperture()
     if (data != NULL)
     {
         delete[] data;
-    }
+    }*/
 }
 
 void MyCamera::_client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg)

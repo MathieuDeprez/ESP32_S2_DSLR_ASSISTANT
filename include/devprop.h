@@ -48,6 +48,7 @@ const char msgFocalLengthMax[] = "FocalLengthMax";
 const char msgACPower[] = "ACPower";
 const char msgAutofocusMode[] = "AutofocusMode";
 const char msgAFAssist[] = "AFAssist";
+const char msgLiveView[] = "LiveView";
 
 // Data Types
 const char msgUNDEF[] = "UNDEF";
@@ -75,16 +76,6 @@ const char msgSTR[] = "STR";
 
 class DevProp
 {
-    typedef struct
-    {
-        uint16_t op;
-        const char *desc;
-    } DevPropDesc;
-
-    static DevPropDesc devPropDesc[];
-    static const char *const dtNames1[];
-    static const char *const dtNames2[];
-    static const char *const prNames[];
 
     uint16_t dataType;
     uint8_t bytesSize;
@@ -101,8 +92,21 @@ class DevProp
     uint8_t GetDataSize();
 
 public:
+    typedef struct
+    {
+        uint16_t op;
+        const char *desc;
+        ValueType type;
+    } DevPropDesc;
+
+    static DevPropDesc devPropDesc[];
+    static const char *const dtNames1[];
+    static const char *const dtNames2[];
+    static const char *const prNames[];
+
     void Decode(const uint16_t len, const uint8_t *const pbuf);
     void printEnum(uint8_t len_size, uint8_t val_size, const uint8_t *p);
+    static DevPropDesc *getDesc(uint16_t op);
 };
 
 #endif // __DEVPROPPARSER_H__

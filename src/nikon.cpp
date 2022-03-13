@@ -178,36 +178,90 @@ const ValueTitle<uint16_t, 4> WbTitles[] =
 
 void Nikon::PrintValue(const ValueType valueType, const uint8_t *data, const uint32_t len)
 {
-	Serial.println("PrintValue()");
+	// Serial.println("PrintValue()");
 	switch (valueType)
 	{
 	case ValueTypeAperture:
 	{
-		/*for (uint32_t i = 0; i < len; i++)
-		{
-			Serial.printf("%02x ", data[i]);
-		}
-		Serial.println();*/
-
-		uint16_t *apertureValue = (uint16_t *)&data[12];
-		//Serial.printf("%04x\n", *apertureValue);
+		uint16_t apertureValue = *(uint16_t *)&data[12];
 		bool found = false;
 		for (uint8_t i = 0; i < sizeof(ApertureTitles) / sizeof(ApertureTitles[0]); i++)
 		{
-			if (ApertureTitles[i].value == *apertureValue)
+			if (ApertureTitles[i].value == apertureValue)
 			{
 				Serial.printf("Aperture: F%s\n", ApertureTitles[i].title);
 				found = true;
 				break;
 			}
 		}
-		if(!found){
+		if (!found)
+		{
 			Serial.printf("Aperture title not found.");
 		}
 	}
 	break;
-
+	case ValueTypeExposureTime:
+	{
+		uint16_t exposureValue = *(uint16_t *)&data[12];
+		bool found = false;
+		for (uint8_t i = 0; i < sizeof(ShutterSpeedTitles) / sizeof(ShutterSpeedTitles[0]); i++)
+		{
+			if (ShutterSpeedTitles[i].value == exposureValue)
+			{
+				Serial.printf("Shutter Speed: %s\n", ShutterSpeedTitles[i].title);
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+		{
+			Serial.printf("Shutter Speed title not found.");
+		}
+	}
+	break;
+	case ValueTypeLiveView:
+	{
+		uint8_t liveViewStatus = *(uint8_t *)&data[12];
+		Serial.printf("liveViewStatus: %d\n", liveViewStatus);
+	}
+	break;
+	case ValueTypeEvent:
+	{
+		for (uint32_t i = 0; i < len; i++)
+		{
+			Serial.printf("%02x ", data[i]);
+		}
+		Serial.println();
+		uint16_t numberOfEvents = *(uint16_t *)&data[12];
+		for (uint16_t i = 0; i < numberOfEvents; i++)
+		{
+			uint16_t eventCode = *(uint16_t *)&data[i * 6 + 14];
+			if (eventCode == PTP_EC_DevicePropChanged)
+			{
+				uint16_t devicePropertiesCode = *(uint16_t *)&data[i * 6 + 16];
+				DevProp::DevPropDesc *propDesc = DevProp::getDesc(devicePropertiesCode);
+				if (propDesc != NULL)
+				{
+					Serial.println(propDesc->desc);
+					myCamera.getDevProp(*propDesc);
+				}
+				else
+				{
+					Serial.printf("%04x", devicePropertiesCode);
+					Serial.print(" (Property not defined)\r\n");
+				}
+			}
+			else
+			{
+				Serial.printf("EventCode: %04x\n", eventCode);
+			}
+		}
+	}
+	break;
 	default:
+		if (valueType == ValueTypeNone)
+			break;
+		Serial.printf("default valueType: %04x\n", valueType);
 		break;
 	}
 }

@@ -126,7 +126,7 @@ void loop()
 {
   myCamera.loopUsb();
 
-  delay(100);
+  // delay(100);
 
   static unsigned long beginEvent = millis();
   if (millis() - beginEvent > 2000 && myCamera.isCameraReady)
@@ -148,8 +148,10 @@ void loop()
     }*/
     else
     {
-      myCamera.getAperture();
+      // myCamera.getAperture();
       // myCamera.checkEvent();
+      myCamera.getImage();
+      beginEvent = millis() - 3000;
     }
   }
   // Usb.Task();

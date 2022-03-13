@@ -743,16 +743,17 @@ void MyCamera::getImage()
 
         if (responseCode == PTP_RC_OK && data != NULL)
         {
-            /*Serial.println("LiveView image:");
-            for (uint32_t i = 0; i < total; i++)
+            Serial.println("LiveView image:");
+            /*for (uint32_t i = 0; i < total; i++)
             {
                 Serial.printf("%02x", data[i]);
-                if ((i + 1) % 32 == 0)
+                if ((i + 1) % 128 == 0)
                 {
                     Serial.println();
                 }
             }
             Serial.println();*/
+            ws.binaryAll(data,total);
             Serial.printf("image received in %lums.\n", millis() - timerGetImage);
             timerGetImage = millis();
         }

@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <main.h>
+#include "main.h"
 #ifndef MYCAMERA_CLASS
 #define MYCAMERA_CLASS
 

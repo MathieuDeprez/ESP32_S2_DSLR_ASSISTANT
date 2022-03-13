@@ -1,5 +1,7 @@
 #include "main.h"
 #include "main_variable.h"
+
+#include "wifiCredentials.h"
 /*
 #include <hidboot.h>
 #include <usbhub.h>
@@ -107,6 +109,90 @@ HIDBoot<USB_HID_PROTOCOL_KEYBOARD> HidKeyboard(&Usb);
 
 KbdRptParser Prs;*/
 
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+
+void notifyClients()
+{
+  ws.textAll("ABC");
+}
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
+{
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+  {
+    data[len] = 0;
+    if (strcmp((char *)data, "toggle") == 0)
+    {
+      Serial.println("toggle");
+      notifyClients();
+    }
+  }
+}
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+             void *arg, uint8_t *data, size_t len)
+{
+  switch (type)
+  {
+  case WS_EVT_CONNECT:
+    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+    break;
+  case WS_EVT_DISCONNECT:
+    Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    break;
+  case WS_EVT_DATA:
+    handleWebSocketMessage(arg, data, len);
+    break;
+  case WS_EVT_PONG:
+  case WS_EVT_ERROR:
+    break;
+  }
+}
+
+void initWebSocket()
+{
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
+String processor(const String &var)
+{
+  Serial.println(var);
+  if (var == "STATE")
+  {
+    if (1)
+    {
+      return "ON";
+    }
+    else
+    {
+      return "OFF";
+    }
+  }
+  return String();
+}
+
+void webSocketInit()
+{
+  WiFi.begin(mySsid, myPassword);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(1000);
+    Serial.println("Connecting to WiFi..");
+  }
+
+  Serial.println(WiFi.localIP());
+
+  initWebSocket();
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", index_html, processor); });
+
+  // Start server
+  server.begin();
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -118,6 +204,8 @@ void setup()
   delay(200);
 
   HidKeyboard.SetReportParser(0, &Prs);*/
+
+  webSocketInit();
 
   myCamera.init();
 }

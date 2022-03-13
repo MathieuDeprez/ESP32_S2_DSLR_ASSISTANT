@@ -753,7 +753,7 @@ void MyCamera::getImage()
                 }
             }
             Serial.println();*/
-            ws.binaryAll(data,total);
+            ws.binaryAll(data, total);
             Serial.printf("image received in %lums.\n", millis() - timerGetImage);
             timerGetImage = millis();
         }
@@ -785,19 +785,29 @@ bool MyCamera::getLiveViewStatus()
 void MyCamera::setLiveViewStatus(bool status)
 {
     Serial.printf("Setting liveView to %d\n", status);
+    uint16_t responseCode = PTP_RC_DeviceBusy;
     uint16_t opCode = status ? PTP_OC_NIKON_StartLiveView : PTP_OC_NIKON_EndLiveView;
-    Operation(PTP_OC_NIKON_StartLiveView, 0, NULL);
-    uint8_t *data = NULL;
-    uint32_t total = 0;
-    uint16_t responseCode = getResponseCode(1000, data, total);
 
-    if (responseCode != PTP_RC_OK)
+    while (responseCode == PTP_RC_DeviceBusy)
     {
-        Serial.printf("fail to setLiveView %04x\n", responseCode);
-    }
-    if (data != NULL)
-    {
-        delete[] data;
+        Operation(opCode, 0, NULL);
+        uint8_t *data = NULL;
+        uint32_t total = 0;
+        responseCode = getResponseCode(1000, data, total);
+
+        if (responseCode != PTP_RC_OK)
+        {
+            Serial.printf("fail to setLiveView %04x\n", responseCode);
+        }
+        else if (responseCode != PTP_RC_DeviceBusy)
+        {
+            liveViewStatus = status;
+            ws.textAll("LV:" + String(liveViewStatus));
+        }
+        if (data != NULL)
+        {
+            delete[] data;
+        }
     }
 }
 

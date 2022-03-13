@@ -23,6 +23,7 @@ const TickType_t CLIENT_EVENT_TIMEOUT = 1;
 extern char AzertyArraySpe[8][8];
 extern char AzertyArray[102][8];
 extern AsyncWebSocket ws;
+extern bool liveViewStatus;
 
 extern MyCamera myCamera;
 extern DevProp devProp;

@@ -2,6 +2,8 @@
 #include "main_variable.h"
 
 #include "wifiCredentials.h"
+
+bool liveViewStatus = false;
 /*
 #include <hidboot.h>
 #include <usbhub.h>
@@ -111,6 +113,7 @@ KbdRptParser Prs;*/
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
+int toggleLiveViewRP = 1;
 
 void notifyClients()
 {
@@ -123,10 +126,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
   {
     data[len] = 0;
-    if (strcmp((char *)data, "toggle") == 0)
+    if (strcmp((char *)data, "toggleLiveView") == 0)
     {
-      Serial.println("toggle");
-      notifyClients();
+      Serial.println("toggleLiveView");
+      toggleLiveViewRP = !liveViewStatus;
+      // notifyClients();
     }
   }
 }
@@ -156,12 +160,12 @@ void initWebSocket()
   server.addHandler(&ws);
 }
 
-String processor(const String &var)
+String wsCallback(const String &var)
 {
   Serial.println(var);
-  if (var == "STATE")
+  if (var == "LIVE_VIEW_STATE")
   {
-    if (1)
+    if (liveViewStatus)
     {
       return "ON";
     }
@@ -187,7 +191,7 @@ void webSocketInit()
   initWebSocket();
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send_P(200, "text/html", index_html, processor); });
+            { request->send_P(200, "text/html", index_html, wsCallback); });
 
   // Start server
   server.begin();
@@ -238,8 +242,16 @@ void loop()
     {
       // myCamera.getAperture();
       // myCamera.checkEvent();
-      myCamera.getImage();
-      beginEvent = millis() - 3000;
+      if (toggleLiveViewRP != -1)
+      {
+        myCamera.setLiveViewStatus(toggleLiveViewRP);
+        toggleLiveViewRP = -1;
+      }
+      else if (liveViewStatus)
+      {
+        myCamera.getImage();
+        beginEvent = millis() - 3000;
+      }
     }
   }
   // Usb.Task();

@@ -24,6 +24,7 @@ extern char AzertyArraySpe[8][8];
 extern char AzertyArray[102][8];
 extern AsyncWebSocket ws;
 extern bool liveViewStatus;
+extern uint32_t *listOfHandles;
 
 extern MyCamera myCamera;
 extern DevProp devProp;

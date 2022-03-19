@@ -24,13 +24,16 @@ public:
     uint32_t getDevProp(DevProp::DevPropDesc propDesc);
     void openSession();
     void getImage();
+    void getPreview();
+    void getPreviewHq();
+    void GetObjectHandles();
     bool getLiveViewStatus();
     void setLiveViewStatus(bool status);
     void getDevProps();
     void flushQueue();
     void Operation(uint16_t opCode, uint8_t nbrParams, uint32_t *params);
     // void PrintDevProp(uint8_t **pp, uint16_t *pcntdn);
-    uint16_t getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total);
+    uint16_t getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total, bool toData = true);
     static bool isCameraReady;
 
 private:

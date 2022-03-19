@@ -89,7 +89,8 @@
         <div class="card">
             <h2>Output - LiveView status</h2>
             <p class="state">state: <span id="state">%LIVE_VIEW_STATE%</span></p>
-            <p><button id="button" class="button">Toggle</button></p>
+            <p><button id="buttonLV" class="button">Toggle</button></p>
+            <p><button id="buttonPV" class="button">Preview</button></p>
         </div>
         <img id="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA
             AAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO
@@ -154,10 +155,14 @@
             initButton();
         }
         function initButton() {
-            document.getElementById('button').addEventListener('click', toggleLiveView);
+            document.getElementById("buttonLV").addEventListener('click', toggleLiveView);
+            document.getElementById("buttonPV").addEventListener('click', getPreview);
         }
         function toggleLiveView() {
             websocket.send('toggleLiveView');
+        }
+        function getPreview() {
+            websocket.send('getPreview');
         }
     </script>
 </body>

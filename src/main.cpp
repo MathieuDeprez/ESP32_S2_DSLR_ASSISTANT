@@ -113,7 +113,7 @@ KbdRptParser Prs;*/
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-int toggleLiveViewRP = 1;
+int toggleLiveViewRP = -1;
 
 void notifyClients()
 {
@@ -131,6 +131,12 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       Serial.println("toggleLiveView");
       toggleLiveViewRP = !liveViewStatus;
       // notifyClients();
+    }
+    else if (strcmp((char *)data, "getPreview") == 0)
+    {
+      Serial.println("getPreview");
+      myCamera.getPreview();
+      //myCamera.GetObjectHandles();
     }
   }
 }

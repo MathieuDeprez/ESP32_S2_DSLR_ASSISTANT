@@ -69,17 +69,76 @@ void MyCamera::_camera_transfer_cb(usb_transfer_t *transfer)
             //{
 
             /*Serial.printf("transfer received from %02x: ", transfer->bEndpointAddress);
-            for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
-            {
-                Serial.printf("%02x ", p[i]);
-            }
-            Serial.println();*/
+             */
 
             uint16_t container_type = p[4] | (p[5] << 8);
 
             if (container_type == PTP_USB_CONTAINER_DATA || total != 0)
             {
+                static uint8_t isJpg = 0;
 
+                for (uint8_t i = 0; i < transfer->actual_num_bytes; i++)
+                {
+                    if (isJpg == 0 && p[i] == 0xff)
+                    {
+                        isJpg = 1;
+                    }
+                    else if (isJpg == 1)
+                    {
+                        if (p[i] == 0xd8)
+                        {
+                            isJpg = 2;
+                        }
+                        else
+                        {
+                            isJpg = 0;
+                        }
+                    }
+                    else if (isJpg == 2)
+                    {
+                        if (p[i] == 0xff)
+                        {
+                            isJpg = 3;
+                            Serial.println("isJpg = 3");
+                        }
+                        else
+                        {
+                            isJpg = 0;
+                            Serial.println("isJpg = 0");
+                        }
+                    }
+                    else if (isJpg == 3)
+                    {
+                        if (p[i] == 0xff)
+                        {
+                            isJpg = 4;
+                            Serial.println("isJpg = 4");
+                        }
+                        else
+                        {
+                            isJpg = 3;
+                            Serial.println("isJpg = 3");
+                        }
+                    }
+                    else if (isJpg == 4)
+                    {
+                        if (p[i] == 0xd9)
+                        {
+                            Serial.printf("%02x\nDone !\n", p[i]);
+                            isJpg = 0;
+                        }
+                        else
+                        {
+                            isJpg = 4;
+                            Serial.println("isJpg =4");
+                        }
+                    }
+
+                    if (isJpg >= 3)
+                    {
+                        Serial.printf("%02x ", p[i]);
+                    }
+                }
                 // Serial.println("PTP_USB_CONTAINER_DATA");
                 {
                     uint16_t operation_code = p[6] | (p[7] << 8);
@@ -475,7 +534,7 @@ void MyCamera::flushQueue()
     if (number)
         Serial.printf("flush %d message\n", number);
 }
-uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total)
+uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &total, bool toData)
 {
     uint16_t responseCode = 0;
     PtpTransfer transfer;
@@ -496,7 +555,7 @@ uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &t
             if (transfer.data[4] == PTP_USB_CONTAINER_DATA || pending != 0)
             {
                 // Serial.printf("%d+%d=%d/%d\n", transfer.offset, transfer.len, transfer.offset + transfer.len, transfer.total);
-                if (total == 0)
+                if (total == 0 && toData)
                 {
                     total = transfer.total;
                     data = new uint8_t[total];
@@ -507,7 +566,10 @@ uint16_t MyCamera::getResponseCode(uint32_t timeout, uint8_t *&data, uint32_t &t
                     }
                     memset(data, 0, total);
                 }
-                memcpy(data + transfer.offset, transfer.data, transfer.len);
+                if (toData)
+                {
+                    memcpy(data + transfer.offset, transfer.data, transfer.len);
+                }
 
                 pending = total - (transfer.offset + transfer.len);
             }
@@ -839,6 +901,120 @@ void MyCamera::openSession()
     Operation(PTP_OC_OpenSession, 1, &param);
 }
 
+void MyCamera::getPreview()
+{
+    if (listOfHandles == NULL)
+    {
+        GetObjectHandles();
+    }
+    if (listOfHandles == NULL)
+    {
+        Serial.println("listOfHandles NULL");
+        return;
+    }
+    delay(1000);
+
+    uint32_t param = listOfHandles[3];
+    Operation(PTP_OC_GetObject, 1, &param);
+    uint8_t *data = NULL;
+    uint32_t total = 0;
+    uint16_t responseCode = getResponseCode(200, data, total, 0);
+
+    if (responseCode == PTP_RC_OK && data != NULL)
+    {
+        for (uint32_t i = 0; i < total; i++)
+        {
+            Serial.printf("%04x ", data[i]);
+        }
+        Serial.println();
+    }
+    else
+    {
+        Serial.println("Error getting Preview");
+    }
+
+    if (data != NULL)
+    {
+        delete[] data;
+    }
+}
+/*
+void MyCamera::getPreviewHq()
+{
+    uint32_t param = 0;
+    Operation(PTP_OC_GetObject, 1)
+}*/
+uint32_t *listOfHandles = NULL;
+void MyCamera::GetObjectHandles()
+{
+    // OperFlags flags = {3, 0, 0, 1, 1, 0};
+    uint32_t storage_id = 0xffffffff;
+    uint16_t format = 0;
+    uint16_t assoc = 0;
+
+    uint32_t params[3] = {storage_id, format, assoc};
+
+    Operation(PTP_OC_GetObjectHandles, 3, params);
+    uint8_t *data = NULL;
+    uint32_t total = 0;
+    uint16_t responseCode = getResponseCode(200, data, total);
+
+    if (listOfHandles != NULL)
+    {
+        delete[] listOfHandles;
+        listOfHandles = NULL;
+    }
+
+    if (responseCode == PTP_RC_OK && data != NULL)
+    {
+        uint32_t numberOfHandles = *(uint32_t *)&data[12];
+        Serial.printf("numberOfHandles: %d\n", numberOfHandles);
+        listOfHandles = new uint32_t[numberOfHandles];
+        for (uint32_t i = 0; i < numberOfHandles; i++)
+        {
+            listOfHandles[i] = *(uint32_t *)&data[16 + i * 4];
+            Serial.printf("%04x->%d\n", listOfHandles[i], listOfHandles[i]);
+        }
+    }
+    else
+    {
+        Serial.println("Error getting Handles");
+    }
+
+    if (data != NULL)
+    {
+        delete[] data;
+    }
+}
+/*
+uint16_t NikonDSLR::GetJpegV2(uint32_t handle, uint8_t *&response, uint32_t &responseLenght)
+{
+    MyParamBlock myParamBlock;
+    myParamBlock.numberOfParam = 1;
+    myParamBlock.params[0] = handle;
+    myParamBlock.params[1] = 0; // 0= JPEG
+
+    MyDataBlock myDataBlock;
+    myDataBlock.dataSize = 0;
+    myDataBlock.txOperation = 0;
+
+    return TransactionV2(MyOpCode::GetObject, myParamBlock, myDataBlock, response, responseLenght);
+}
+
+uint16_t NikonDSLR::GetJpegHqV2(uint32_t handle, uint8_t *&response, uint32_t &responseLenght)
+{
+    MyParamBlock myParamBlock;
+    myParamBlock.numberOfParam = 1;
+    myParamBlock.params[0] = handle;
+    myParamBlock.params[1] = 1; // 1 = JPEG HQ
+
+    MyDataBlock myDataBlock;
+    myDataBlock.dataSize = 0;
+    myDataBlock.txOperation = 0;
+
+    return TransactionV2(MyOpCode::GetObject, myParamBlock, myDataBlock, response, responseLenght);
+}
+*/
 uint32_t MyCamera::getDevProp(DevProp::DevPropDesc propDesc)
 {
     uint32_t param = propDesc.op;
